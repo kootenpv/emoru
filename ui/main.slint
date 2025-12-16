@@ -1,0 +1,345 @@
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+struct EmojiEntry {
+    emoji: string,
+    description: string,
+    prefix: string,
+    match-text: string,
+    suffix: string,
+    image-data: image,
+}
+
+export component EmojiPicker inherits Window {
+    title: "emoji-picker";
+    width: 1200px;
+    height: 320px;
+    always-on-top: true;
+
+    in property <string> search-text: "";
+    in property <[EmojiEntry]> emoji-entries: [];
+    in property <int> selected-index: 0;
+
+    callback key-pressed(string);
+    callback close-requested();
+    callback emoji-selected(string);
+
+    background: #d4e5f7;
+
+    VerticalBox {
+        padding: 8px;
+        spacing: 4px;
+
+        // Search text display - fixed height row
+        Rectangle {
+            height: 32px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.search-text;
+                font-size: 12pt;
+                font-family: "Helvetica";
+                font-weight: 700;
+                color: black;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+                width: 100%;
+                x: 4px;
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: #888888;
+        }
+
+        // Row 0
+        Rectangle {
+            background: 0 == root.selected-index && root.emoji-entries.length > 0 ? #a6d2ff : transparent;
+            border-radius: 4px;
+            height: 52px;
+
+            HorizontalBox {
+                spacing: 8px;
+                padding: 4px;
+                alignment: start;
+
+                if root.emoji-entries.length > 0: Image {
+                    width: 44px;
+                    height: 44px;
+                    source: root.emoji-entries[0].image-data;
+                    image-fit: contain;
+                }
+
+                if root.emoji-entries.length > 0: HorizontalBox {
+                    spacing: 0;
+                    Text {
+                        text: root.emoji-entries[0].prefix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[0].match-text;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        font-weight: 700;
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[0].suffix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.emoji-entries.length == 0: Text {
+                    text: "Start typing to match emotes!";
+                    font-size: 14pt;
+                    font-family: "Helvetica";
+                    color: #666666;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Row 1
+        Rectangle {
+            background: 1 == root.selected-index && root.emoji-entries.length > 1 ? #a6d2ff : transparent;
+            border-radius: 4px;
+            height: 52px;
+
+            HorizontalBox {
+                spacing: 8px;
+                padding: 4px;
+                alignment: start;
+
+                if root.emoji-entries.length > 1: Image {
+                    width: 44px;
+                    height: 44px;
+                    source: root.emoji-entries[1].image-data;
+                    image-fit: contain;
+                }
+
+                if root.emoji-entries.length > 1: HorizontalBox {
+                    spacing: 0;
+                    Text {
+                        text: root.emoji-entries[1].prefix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[1].match-text;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        font-weight: 700;
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[1].suffix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Row 2
+        Rectangle {
+            background: 2 == root.selected-index && root.emoji-entries.length > 2 ? #a6d2ff : transparent;
+            border-radius: 4px;
+            height: 52px;
+
+            HorizontalBox {
+                spacing: 8px;
+                padding: 4px;
+                alignment: start;
+
+                if root.emoji-entries.length > 2: Image {
+                    width: 44px;
+                    height: 44px;
+                    source: root.emoji-entries[2].image-data;
+                    image-fit: contain;
+                }
+
+                if root.emoji-entries.length > 2: HorizontalBox {
+                    spacing: 0;
+                    Text {
+                        text: root.emoji-entries[2].prefix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[2].match-text;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        font-weight: 700;
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[2].suffix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.emoji-entries.length <= 2: Text {
+                    text: "Press Escape to exit";
+                    font-size: 14pt;
+                    font-family: "Helvetica";
+                    color: #666666;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Row 3
+        Rectangle {
+            background: 3 == root.selected-index && root.emoji-entries.length > 3 ? #a6d2ff : transparent;
+            border-radius: 4px;
+            height: 52px;
+
+            HorizontalBox {
+                spacing: 8px;
+                padding: 4px;
+                alignment: start;
+
+                if root.emoji-entries.length > 3: Image {
+                    width: 44px;
+                    height: 44px;
+                    source: root.emoji-entries[3].image-data;
+                    image-fit: contain;
+                }
+
+                if root.emoji-entries.length > 3: HorizontalBox {
+                    spacing: 0;
+                    Text {
+                        text: root.emoji-entries[3].prefix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[3].match-text;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        font-weight: 700;
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[3].suffix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.emoji-entries.length <= 3: Text {
+                    text: "Hit Return to choose.";
+                    font-size: 14pt;
+                    font-family: "Helvetica";
+                    color: #666666;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // Row 4
+        Rectangle {
+            background: 4 == root.selected-index && root.emoji-entries.length > 4 ? #a6d2ff : transparent;
+            border-radius: 4px;
+            height: 52px;
+
+            HorizontalBox {
+                spacing: 8px;
+                padding: 4px;
+                alignment: start;
+
+                if root.emoji-entries.length > 4: Image {
+                    width: 44px;
+                    height: 44px;
+                    source: root.emoji-entries[4].image-data;
+                    image-fit: contain;
+                }
+
+                if root.emoji-entries.length > 4: HorizontalBox {
+                    spacing: 0;
+                    Text {
+                        text: root.emoji-entries[4].prefix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[4].match-text;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        font-weight: 700;
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.emoji-entries[4].suffix;
+                        font-size: 14pt;
+                        font-family: "Helvetica";
+                        color: black;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.emoji-entries.length <= 4: Text {
+                    text: "Ctrl-Backspace to empty";
+                    font-size: 14pt;
+                    font-family: "Helvetica";
+                    color: #666666;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // Global key handler
+    forward-focus: key-handler;
+    key-handler := FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.close-requested();
+                accept
+            } else if event.text == Key.Return {
+                root.emoji-selected(root.emoji-entries[root.selected-index].emoji);
+                accept
+            } else if event.text == Key.UpArrow {
+                root.key-pressed("up");
+                accept
+            } else if event.text == Key.DownArrow {
+                root.key-pressed("down");
+                accept
+            } else if event.text == Key.Backspace {
+                if event.modifiers.control {
+                    root.key-pressed("ctrl-backspace");
+                } else {
+                    root.key-pressed("backspace");
+                }
+                accept
+            } else if event.text.character-count > 0 {
+                root.key-pressed(event.text);
+                accept
+            } else {
+                reject
+            }
+        }
+    }
+}

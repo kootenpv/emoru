@@ -1,0 +1,15 @@
+[package]
+name = "emoru"
+version = "0.1.0"
+edition = "2021"
+description = "Cross-platform emoji picker"
+
+[dependencies]
+slint = "1.9"
+arboard = "3"  # Clipboard support
+image = "0.25"
+base64 = "0.22"
+dirs = "5"  # For home directory expansion
+
+[build-dependencies]
+slint-build = "1.9"
