@@ -335,8 +335,13 @@ export component EmojiPicker inherits Window {
                 }
                 accept
             } else if event.text.character-count > 0 {
-                root.key-pressed(event.text);
-                accept
+                // Ignore modifier key presses (Alt, Shift, Control, Meta)
+                if event.modifiers.alt || event.modifiers.meta || event.modifiers.control {
+                    reject
+                } else {
+                    root.key-pressed(event.text);
+                    accept
+                }
             } else {
                 reject
             }

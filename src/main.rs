@@ -206,6 +206,10 @@ impl AppState {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    // Suppress Qt warnings (including thread cleanup warnings)
+    std::env::set_var("QT_LOGGING_RULES", "*=false");
+    std::env::set_var("QT_MESSAGE_PATTERN", "");
+
     let app = EmojiPicker::new()?;
     let state = Rc::new(RefCell::new(AppState::new()));
 
