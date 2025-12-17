@@ -46,10 +46,6 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Sign macOS binary (ad-hoc)
-        if: contains(matrix.target, 'apple-darwin')
-        run: codesign -s - target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
-
       - name: Create release archive
         run: |
           mkdir -p release

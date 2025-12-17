@@ -1,14 +1,270 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::collections::HashMap;
 
 use arboard::Clipboard;
+use serde::{Deserialize, Serialize};
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer, ModelRc, VecModel, SharedString};
 
 slint::include_modules!();
 
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+enum LogEvent {
+    #[serde(rename = "keystroke")]
+    Keystroke { ts: u64, key: String },
+    #[serde(rename = "select")]
+    Select { ts: u64, code: String, query: String },
+}
+
+fn get_log_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join("emoru_strokes.jsonl"))
+}
+
+fn log_event(event: &LogEvent) {
+    if let Some(path) = get_log_path() {
+        if let Ok(mut file) = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            if let Ok(json) = serde_json::to_string(event) {
+                let _ = writeln!(file, "{}", json);
+            }
+        }
+    }
+}
+
+fn current_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// A recorded emoji selection with query context
+#[derive(Clone)]
+struct Selection {
+    code: String,
+    query: String,
+    ts: u64,
+}
+
+/// Load all selections from the log file
+fn load_selections() -> Vec<Selection> {
+    let mut selections = Vec::new();
+
+    if let Some(path) = get_log_path() {
+        if let Ok(file) = fs::File::open(&path) {
+            let reader = BufReader::new(file);
+            for line in reader.lines().map_while(Result::ok) {
+                if let Ok(event) = serde_json::from_str::<LogEvent>(&line) {
+                    if let LogEvent::Select { ts, code, query } = event {
+                        selections.push(Selection { code, query: query.to_lowercase(), ts });
+                    }
+                }
+            }
+        }
+    }
+
+    selections
+}
+
+/// Check if two queries are prefix-related (one is prefix of the other)
+fn queries_match(current: &str, stored: &str) -> bool {
+    current.starts_with(stored) || stored.starts_with(current)
+}
+
+/// Calculate frecency scores for a given query, considering query-prefix matching
+fn compute_frecency_for_query(selections: &[Selection], current_query: &str) -> HashMap<String, f64> {
+    let mut scores: HashMap<String, f64> = HashMap::new();
+    let now = current_timestamp();
+    let half_life_secs: f64 = 7.0 * 24.0 * 60.0 * 60.0; // 7 days
+
+    let current_lower = current_query.to_lowercase();
+
+    for sel in selections {
+        // Only count selections where the stored query is prefix-related to current query
+        if current_lower.is_empty() || queries_match(&current_lower, &sel.query) {
+            let age_secs = (now.saturating_sub(sel.ts)) as f64;
+            let decay = 0.5_f64.powf(age_secs / half_life_secs);
+            *scores.entry(sel.code.clone()).or_insert(0.0) += decay;
+        }
+    }
+
+    scores
+}
+
 const NUM_SLOTS: usize = 5;
+
+/// Check if a search term matches a word using fuzzy prefix matching:
+/// - First char of term must match first char of word
+/// - Remaining chars must appear in order (subsequence) in the word
+fn term_matches_word(term: &str, word: &str) -> bool {
+    let mut term_chars = term.chars();
+    let mut word_chars = word.chars();
+
+    // First char must match word start
+    match (term_chars.next(), word_chars.next()) {
+        (Some(tc), Some(wc)) if tc == wc => {}
+        (None, _) => return true, // empty term matches everything
+        _ => return false,
+    }
+
+    // Remaining chars must appear in order (subsequence)
+    for tc in term_chars {
+        loop {
+            match word_chars.next() {
+                Some(wc) if wc == tc => break,
+                Some(_) => continue,
+                None => return false,
+            }
+        }
+    }
+
+    true
+}
+
+/// Check if an emoji entry matches all search terms
+/// Each term must match at least one word in the description
+fn entry_matches_terms(entry: &str, terms: &[&str]) -> bool {
+    let parts: Vec<&str> = entry.split("| ").collect();
+    if parts.len() < 2 {
+        return false;
+    }
+    let description = parts[1].to_lowercase();
+    let words: Vec<&str> = description.split_whitespace().collect();
+
+    // Each term must match at least one word
+    terms.iter().all(|term| {
+        if term.is_empty() {
+            return true;
+        }
+        words.iter().any(|word| term_matches_word(term, word))
+    })
+}
+
+/// Find character indices that match a term using fuzzy subsequence matching
+/// Returns None if no match, or Some(indices) of matched characters in word
+fn find_fuzzy_match_indices(term: &str, word: &str) -> Option<Vec<usize>> {
+    let mut term_chars = term.chars().peekable();
+    let mut indices = Vec::new();
+
+    // First char must match word start
+    let first_term = term_chars.next()?;
+    let mut word_iter = word.char_indices();
+    let (first_idx, first_word) = word_iter.next()?;
+
+    if first_term.to_lowercase().next()? != first_word.to_lowercase().next()? {
+        return None;
+    }
+    indices.push(first_idx);
+
+    // Remaining chars must appear in order
+    for tc in term_chars {
+        let tc_lower = tc.to_lowercase().next()?;
+        loop {
+            match word_iter.next() {
+                Some((idx, wc)) => {
+                    if wc.to_lowercase().next()? == tc_lower {
+                        indices.push(idx);
+                        break;
+                    }
+                }
+                None => return None,
+            }
+        }
+    }
+
+    Some(indices)
+}
+
+/// Build text segments with highlighted (bold) matches for fuzzy prefix matching
+fn build_highlight_segments(text: &str, terms: &[&str]) -> Vec<TextSegment> {
+    if terms.is_empty() || terms.iter().all(|t| t.is_empty()) {
+        return vec![TextSegment {
+            text: SharedString::from(text),
+            bold: false,
+        }];
+    }
+
+    // Find all character positions to highlight
+    let mut highlight_positions: Vec<bool> = vec![false; text.len()];
+
+    // Split into words with their positions
+    let mut word_start = 0;
+    for word in text.split_whitespace() {
+        // Find actual position of word in text
+        if let Some(pos) = text[word_start..].find(word) {
+            let abs_start = word_start + pos;
+            let word_lower = word.to_lowercase();
+
+            // Check each term against this word
+            for term in terms {
+                if term.is_empty() {
+                    continue;
+                }
+                if let Some(indices) = find_fuzzy_match_indices(term, &word_lower) {
+                    // Mark these character positions as highlighted
+                    for idx in indices {
+                        let abs_idx = abs_start + idx;
+                        if abs_idx < highlight_positions.len() {
+                            highlight_positions[abs_idx] = true;
+                        }
+                    }
+                }
+            }
+            word_start = abs_start + word.len();
+        }
+    }
+
+    // Build segments from highlight positions
+    let mut segments = Vec::new();
+    let mut current_text = String::new();
+    let mut current_bold = false;
+    let mut first = true;
+
+    for (i, ch) in text.char_indices() {
+        let should_bold = highlight_positions.get(i).copied().unwrap_or(false);
+
+        if first {
+            current_bold = should_bold;
+            first = false;
+        }
+
+        if should_bold != current_bold {
+            if !current_text.is_empty() {
+                segments.push(TextSegment {
+                    text: SharedString::from(&current_text),
+                    bold: current_bold,
+                });
+                current_text.clear();
+            }
+            current_bold = should_bold;
+        }
+        current_text.push(ch);
+    }
+
+    if !current_text.is_empty() {
+        segments.push(TextSegment {
+            text: SharedString::from(&current_text),
+            bold: current_bold,
+        });
+    }
+
+    if segments.is_empty() {
+        segments.push(TextSegment {
+            text: SharedString::from(text),
+            bold: false,
+        });
+    }
+
+    segments
+}
 
 /// Find the data directory containing emoji files.
 /// Searches in order:
@@ -56,8 +312,9 @@ struct AppState {
     matches: Vec<String>,
     selected_index: i32,
     selected_emoji: Option<String>,
-    image_cache: std::collections::HashMap<String, Image>,
+    image_cache: HashMap<String, Image>,
     data_dir: Option<PathBuf>,
+    selections: Vec<Selection>,
 }
 
 impl AppState {
@@ -68,8 +325,19 @@ impl AppState {
             matches: Vec::new(),
             selected_index: 0,
             selected_emoji: None,
-            image_cache: std::collections::HashMap::new(),
+            image_cache: HashMap::new(),
             data_dir: find_data_dir(),
+            selections: load_selections(),
+        }
+    }
+
+    /// Get the emoji code from an entry string
+    fn get_code(entry: &str) -> Option<String> {
+        let parts: Vec<&str> = entry.split("| ").collect();
+        if parts.len() >= 3 {
+            Some(parts[2].to_string())
+        } else {
+            None
         }
     }
 
@@ -100,16 +368,45 @@ impl AppState {
 
     fn search(&mut self) {
         let query: String = self.letters.iter().collect::<String>().to_lowercase();
+        let terms: Vec<&str> = query.split_whitespace().collect();
 
-        self.matches = self.emojis
+        // Compute frecency scores based on current query prefix
+        let frecency = compute_frecency_for_query(&self.selections, &query);
+
+        // Helper to get frecency for an entry
+        let get_frecency = |entry: &str| -> f64 {
+            if let Some(code) = Self::get_code(entry) {
+                *frecency.get(&code).unwrap_or(&0.0)
+            } else {
+                0.0
+            }
+        };
+
+        // Filter matching emojis using fuzzy prefix matching
+        let mut filtered: Vec<String> = self.emojis
             .iter()
-            .filter(|e| e.to_lowercase().contains(&query))
-            .take(NUM_SLOTS)
+            .filter(|e| entry_matches_terms(e, &terms))
             .cloned()
             .collect();
 
+        // Sort by frecency (highest first)
+        filtered.sort_by(|a, b| {
+            let fa = get_frecency(a);
+            let fb = get_frecency(b);
+            fb.partial_cmp(&fa).unwrap_or(std::cmp::Ordering::Equal)
+        });
+
+        self.matches = filtered.into_iter().take(NUM_SLOTS).collect();
+
         if self.matches.is_empty() && !self.emojis.is_empty() {
-            self.matches = self.emojis.iter().take(NUM_SLOTS).cloned().collect();
+            // Show top frecency emojis when no query (all selections count)
+            let mut top: Vec<String> = self.emojis.clone();
+            top.sort_by(|a, b| {
+                let fa = get_frecency(a);
+                let fb = get_frecency(b);
+                fb.partial_cmp(&fa).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            self.matches = top.into_iter().take(NUM_SLOTS).collect();
         }
 
         // Ensure selected_index is within bounds
@@ -158,6 +455,7 @@ impl AppState {
     fn get_emoji_entries(&mut self) -> Vec<EmojiEntry> {
         let mut entries = Vec::new();
         let query: String = self.letters.iter().collect::<String>().to_lowercase();
+        let terms: Vec<&str> = query.split_whitespace().collect();
 
         for entry in &self.matches.clone() {
             let parts: Vec<&str> = entry.split("| ").collect();
@@ -167,35 +465,20 @@ impl AppState {
                 let code = parts[2].to_string();
                 let image_data = self.load_image(&code).unwrap_or_default();
 
-                // Find match position for highlighting
-                let (prefix, match_text, suffix) = if !query.is_empty() {
-                    if let Some(pos) = description.to_lowercase().find(&query) {
-                        let p = description[..pos].to_string();
-                        let m = description[pos..pos + query.len()].to_string();
-                        let s = description[pos + query.len()..].to_string();
-                        (p, m, s)
-                    } else {
-                        (description.clone(), String::new(), String::new())
-                    }
-                } else {
-                    (description.clone(), String::new(), String::new())
-                };
+                // Build segments with multi-term highlighting
+                let segments = build_highlight_segments(&description, &terms);
 
                 entries.push(EmojiEntry {
                     emoji: SharedString::from(emoji),
                     description: SharedString::from(description),
-                    prefix: SharedString::from(prefix),
-                    match_text: SharedString::from(match_text),
-                    suffix: SharedString::from(suffix),
+                    segments: ModelRc::from(Rc::new(VecModel::from(segments))),
                     image_data,
                 });
             } else {
                 entries.push(EmojiEntry {
                     emoji: SharedString::default(),
                     description: SharedString::default(),
-                    prefix: SharedString::default(),
-                    match_text: SharedString::default(),
-                    suffix: SharedString::default(),
+                    segments: ModelRc::default(),
                     image_data: Image::default(),
                 });
             }
@@ -226,6 +509,12 @@ fn main() -> Result<(), slint::PlatformError> {
     app.on_key_pressed(move |key| {
         let mut state = state_clone.borrow_mut();
         let key_str = key.as_str();
+
+        // Log keystroke
+        log_event(&LogEvent::Keystroke {
+            ts: current_timestamp(),
+            key: key_str.to_string(),
+        });
 
         match key_str {
             "up" => {
@@ -268,7 +557,25 @@ fn main() -> Result<(), slint::PlatformError> {
     let state_clone = state.clone();
     let app_weak = app.as_weak();
     app.on_emoji_selected(move |emoji| {
-        state_clone.borrow_mut().selected_emoji = Some(emoji.to_string());
+        let mut state = state_clone.borrow_mut();
+
+        // Log selection with code and query
+        let query: String = state.letters.iter().collect();
+        let idx = state.selected_index as usize;
+        if let Some(entry) = state.matches.get(idx) {
+            let parts: Vec<&str> = entry.split("| ").collect();
+            if parts.len() >= 3 {
+                let code = parts[2].to_string();
+                log_event(&LogEvent::Select {
+                    ts: current_timestamp(),
+                    code,
+                    query,
+                });
+            }
+        }
+
+        state.selected_emoji = Some(emoji.to_string());
+        drop(state);
         if let Some(app) = app_weak.upgrade() {
             app.hide().ok();
         }

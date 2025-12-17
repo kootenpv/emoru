@@ -1,11 +1,14 @@
 import { VerticalBox, HorizontalBox } from "std-widgets.slint";
 
+struct TextSegment {
+    text: string,
+    bold: bool,
+}
+
 struct EmojiEntry {
     emoji: string,
     description: string,
-    prefix: string,
-    match-text: string,
-    suffix: string,
+    segments: [TextSegment],
     image-data: image,
 }
 
@@ -72,25 +75,11 @@ export component EmojiPicker inherits Window {
 
                 if root.emoji-entries.length > 0: HorizontalBox {
                     spacing: 0;
-                    Text {
-                        text: root.emoji-entries[0].prefix;
+                    for segment in root.emoji-entries[0].segments: Text {
+                        text: segment.text;
                         font-size: 14pt;
                         font-family: "Helvetica";
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[0].match-text;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
-                        font-weight: 700;
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[0].suffix;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
+                        font-weight: segment.bold ? 700 : 400;
                         color: black;
                         vertical-alignment: center;
                     }
@@ -125,25 +114,11 @@ export component EmojiPicker inherits Window {
 
                 if root.emoji-entries.length > 1: HorizontalBox {
                     spacing: 0;
-                    Text {
-                        text: root.emoji-entries[1].prefix;
+                    for segment in root.emoji-entries[1].segments: Text {
+                        text: segment.text;
                         font-size: 14pt;
                         font-family: "Helvetica";
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[1].match-text;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
-                        font-weight: 700;
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[1].suffix;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
+                        font-weight: segment.bold ? 700 : 400;
                         color: black;
                         vertical-alignment: center;
                     }
@@ -171,25 +146,11 @@ export component EmojiPicker inherits Window {
 
                 if root.emoji-entries.length > 2: HorizontalBox {
                     spacing: 0;
-                    Text {
-                        text: root.emoji-entries[2].prefix;
+                    for segment in root.emoji-entries[2].segments: Text {
+                        text: segment.text;
                         font-size: 14pt;
                         font-family: "Helvetica";
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[2].match-text;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
-                        font-weight: 700;
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[2].suffix;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
+                        font-weight: segment.bold ? 700 : 400;
                         color: black;
                         vertical-alignment: center;
                     }
@@ -224,25 +185,11 @@ export component EmojiPicker inherits Window {
 
                 if root.emoji-entries.length > 3: HorizontalBox {
                     spacing: 0;
-                    Text {
-                        text: root.emoji-entries[3].prefix;
+                    for segment in root.emoji-entries[3].segments: Text {
+                        text: segment.text;
                         font-size: 14pt;
                         font-family: "Helvetica";
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[3].match-text;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
-                        font-weight: 700;
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[3].suffix;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
+                        font-weight: segment.bold ? 700 : 400;
                         color: black;
                         vertical-alignment: center;
                     }
@@ -277,25 +224,11 @@ export component EmojiPicker inherits Window {
 
                 if root.emoji-entries.length > 4: HorizontalBox {
                     spacing: 0;
-                    Text {
-                        text: root.emoji-entries[4].prefix;
+                    for segment in root.emoji-entries[4].segments: Text {
+                        text: segment.text;
                         font-size: 14pt;
                         font-family: "Helvetica";
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[4].match-text;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
-                        font-weight: 700;
-                        color: black;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: root.emoji-entries[4].suffix;
-                        font-size: 14pt;
-                        font-family: "Helvetica";
+                        font-weight: segment.bold ? 700 : 400;
                         color: black;
                         vertical-alignment: center;
                     }
