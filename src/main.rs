@@ -245,6 +245,9 @@ fn main() -> Result<(), slint::PlatformError> {
                 state.selected_index = 0;
                 state.search();
             }
+            "shift" => {
+                // Swallow shift key, don't output anything
+            }
             _ => {
                 // Regular character
                 for c in key_str.chars() {
